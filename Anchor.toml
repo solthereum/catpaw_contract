@@ -1,0 +1,21 @@
+[toolchain]
+
+[features]
+seeds = true
+skip-lint = false
+
+[programs.devnet]
+catpaw = "73RsoiwAh7gebpPnfTjxh7LMtShYGsy4EioPzaJK4En9"
+
+[programs.localnet]
+catpaw = "73RsoiwAh7gebpPnfTjxh7LMtShYGsy4EioPzaJK4En9"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Devnet"
+wallet = "/home/ubuntu/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
