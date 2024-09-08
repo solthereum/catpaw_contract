@@ -2,9 +2,9 @@ use anchor_lang::prelude::*;
 
 mod instructions;
 mod account_models;
-mod constant;
+// mod constant;
 
-declare_id!("73RsoiwAh7gebpPnfTjxh7LMtShYGsy4EioPzaJK4En9");
+declare_id!("2E6gtXVfYgPQxfyNR2aBQ5CtEmsU3CCwed1N6sQ3gUEv");
 
 #[program]
 pub mod catpaw {
@@ -15,12 +15,12 @@ pub mod catpaw {
         instructions::init(ctx)
     }
 
-    pub fn startgame(ctx: Context<TransferA>, amount: u64, force: [u8; 32]) -> Result<()> {
-        instructions::transfer_a(ctx, amount, force)
+    pub fn startgame(ctx: Context<TransferA>, amount: u64) -> Result<()> {
+        instructions::transfer_a(ctx, amount)
     }
 
-    pub fn finish_game(ctx: Context<TransferCWV>) -> Result<()> {
-        instructions::transfer_cwv(ctx)
+    pub fn finish_game(ctx: Context<TransferCWV>, multiply: u64, amount: u64) -> Result<()> {
+        instructions::transfer_cwv(ctx, multiply, amount)
     }
 
     pub fn change_a(ctx: Context<ChangeA>) -> Result<()> {
@@ -37,14 +37,5 @@ pub mod catpaw {
 
     pub fn withdraw_a(ctx: Context<WithdrawA>, amount: u64) -> Result<()> {
         instructions::withdraw_a(ctx, amount)
-    }
-
-    pub fn create_token_mint(
-        ctx: Context<CreateTokenMint>,
-        token_name: String,
-        token_symbol: String,
-        token_uri: String,
-    ) -> Result<()> {
-        instructions::create_token_mint(ctx, token_name, token_symbol, token_uri)
     }
 }

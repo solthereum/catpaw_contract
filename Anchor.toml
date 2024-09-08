@@ -1,21 +1,22 @@
 [toolchain]
 
 [features]
-seeds = true
+resolution = true
 skip-lint = false
+seeds = false
 
 [programs.devnet]
-catpaw = "73RsoiwAh7gebpPnfTjxh7LMtShYGsy4EioPzaJK4En9"
+catpaw = "2E6gtXVfYgPQxfyNR2aBQ5CtEmsU3CCwed1N6sQ3gUEv"
 
 [programs.localnet]
-catpaw = "73RsoiwAh7gebpPnfTjxh7LMtShYGsy4EioPzaJK4En9"
+catpaw = "2E6gtXVfYgPQxfyNR2aBQ5CtEmsU3CCwed1N6sQ3gUEv"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
 cluster = "Devnet"
-wallet = "/home/ubuntu/.config/solana/id.json"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

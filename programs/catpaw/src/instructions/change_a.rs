@@ -37,6 +37,7 @@ pub struct ChangeA<'info> {
     pub authority: AccountInfo<'info>,
 
     #[account(
+        mut,
         seeds = [b"catpawconfig"],
         bump,
     )]
@@ -45,12 +46,16 @@ pub struct ChangeA<'info> {
     //New A token gamer have to buy from Pump.fun to play game.
     pub new_mint_token_a: Box<Account<'info, Mint>>,
 
+    ///CHECK: safe
+    #[account(mut)]
+    pub store_account: AccountInfo<'info>,
+
     // PDA account of authority for A token.
     #[account(
         init_if_needed,
         payer = cwv_treasury,
         associated_token::mint = new_mint_token_a,
-        associated_token::authority = authority,
+        associated_token::authority = store_account,
     )]
     pub catpaw_account_a: Box<Account<'info, TokenAccount>>,
 

@@ -43,9 +43,10 @@ pub struct Initialize<'info> {
     pub catpawconfig: Account<'info, CatpawConfig>,
 
     // A token that gamer have to buy from Pump.fun to play game.
+    #[account(mut)]
     pub mint_token_a: Box<Account<'info, Mint>>,
 
-    ///CHECK: safe
+    ///CHECK: safe 
     #[account(mut)]
     pub store_account: AccountInfo<'info>,
 

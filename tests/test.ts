@@ -1,9 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
+import { Program , web3} from "@coral-xyz/anchor";
 import { Catpaw } from "../target/types/catpaw";
 import { BN } from "bn.js";
-import { networkStateAccountAddress } from "@orao-network/solana-vrf";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { expect } from "chai";
 import { TestValues, createValues, expectRevert, mintingTokens, sleep } from "./utils";
 
@@ -20,81 +18,76 @@ describe("catpaw", () => {
     values = createValues();
   });
 
-  // it("Is initialized!", async () => {
+  it("Is initialized!", async () => {
 
-  //     await mintingTokens({
-  //       connection: connection,
-  //       creator:  values.gamer,
-  //       mintAKeypair: values.mintAKeypair,
-  //       program,
-  //     });
+      // A token create and 1000 mint to Gamer. Mint authority is Gamer.
+      await mintingTokens({
+        connection: connection,
+        creator:  values.gamer,
+        mintAKeypair: values.mintAKeypair,
+      });
 
-  //     await mintingTokens({
-  //       connection: connection,
-  //       creator:  values.cwv_treasury,
-  //       mintAKeypair: values.mintCWVKeypair,
-  //       program,
-  //     });
+      // CWV token create and 1000 mint to cwv_treasury. Mint authority is cwv_treasury.
+      await mintingTokens({
+        connection: connection,
+        creator:  values.cwv_treasury,
+        mintAKeypair: values.mintCWVKeypair,
+      });
 
-  //     await expectRevert(program.methods
-  //       .init()
-  //       .accounts({
-  //         mintTokenA: values.mintAKeypair.publicKey, 
-  //         mintTokenCwv: values.mintCWVKeypair.publicKey,
-  //         storeAccount: values.authority,
-  //         authority: values.authority,
-  //         catpawconfig: values.catpawconfigPDA,
-  //         catpawAccountA: values.catpawAccountA,
-  //         catpawAccountCwv: values.catpawAccountCWV,
-  //       })
-  //       .rpc({skipPreflight: true})
-  //     );
+      const tx_init = await program.methods
+        .init()
+        .accounts({
+          mintTokenA: values.mintAKeypair.publicKey, 
+          mintTokenCwv: values.mintCWVKeypair.publicKey,
+          storeAccount: values.authority,
+        })
+        .rpc({skipPreflight: false});
 
-  //     const accountData = await program.account.catpawConfig.fetch(values.catpawconfigPDA);
-  //     expect(accountData.cwvTreasury.toString()).to.equal(values.cwv_treasury.publicKey.toString());
-  //     expect(accountData.storeTokenA.toString()).to.equal(values.authority.toString());
-  //     expect(accountData.mintTokenA.toString()).to.equal(values.mintAKeypair.publicKey.toString());
+      console.log("Init transaction: ", tx_init);
 
-  //     console.log("CWV_treasury address: ", accountData.cwvTreasury.toString());
-  //     console.log("A token address: ", accountData.mintTokenA.toString());
+      const accountData = await program.account.catpawConfig.fetch(values.catpawconfigPDA);
+      expect(accountData.cwvTreasury.toString()).to.equal(values.cwv_treasury.publicKey.toString());
+      expect(accountData.storeTokenA.toString()).to.equal(values.authority.toString());
+      expect(accountData.mintTokenA.toString()).to.equal(values.mintAKeypair.publicKey.toString());
 
-  //     const cwvTreasuryLamports = await connection.getBalance(
-  //       accountData.cwvTreasury
-  //     );
+      console.log("CWV_treasury(contract owner) address: ", accountData.cwvTreasury.toString());
+      console.log("A(Pump.fun) token address: ", accountData.mintTokenA.toString());
 
-  //     console.log("CWV_treasury SOL amount: ", cwvTreasuryLamports);
+      const cwvTreasuryLamports = await connection.getBalance(
+        accountData.cwvTreasury
+      );
 
-  // });
+      console.log("CWV_treasury SOL amount: ", cwvTreasuryLamports);
+
+  });
 
   it("Game start!", async () => {
 
+    // A token create and 1000 mint to Gamer. Mint authority is Gamer.
     await mintingTokens({
       connection: connection,
-      creator: values.gamer,
+      creator:  values.gamer,
       mintAKeypair: values.mintAKeypair,
-      program,
     });
 
+    // CWV token create and 1000 mint to cwv_treasury. Mint authority is cwv_treasury.
     await mintingTokens({
       connection: connection,
-      creator: values.cwv_treasury,
+      creator:  values.cwv_treasury,
       mintAKeypair: values.mintCWVKeypair,
-      program,
     });
 
-    await program.methods
+    const tx_init = await program.methods
       .init()
       .accounts({
-        mintTokenA: values.mintAKeypair.publicKey,
+        mintTokenA: values.mintAKeypair.publicKey, 
         mintTokenCwv: values.mintCWVKeypair.publicKey,
         storeAccount: values.authority,
-        authority: values.authority,
-        catpawconfig: values.catpawconfigPDA,
-        catpawAccountA: values.catpawAccountA,
-        catpawAccountCwv: values.catpawAccountCWV,
       })
-      .rpc()
+      .rpc({skipPreflight: false});
 
+    console.log("Init transaction: ", tx_init);
+      
     const gamerTokenAAmount1 = await connection
       .getTokenAccountBalance(values.gamerAccountA)
       .then((data) => {
@@ -104,7 +97,7 @@ describe("catpaw", () => {
         return 0;
       });
 
-    console.log("gamerTokenAAmount1", gamerTokenAAmount1);
+    console.log("A token amount of Gamer before start game", gamerTokenAAmount1);
 
     const catpawTokenAAmount1 = await connection
       .getTokenAccountBalance(values.catpawAccountA)
@@ -115,25 +108,18 @@ describe("catpaw", () => {
         return 0;
       });
 
-    console.log("catpawTokenAAmount1", catpawTokenAAmount1);
+    console.log("A token amount of contract before start game", catpawTokenAAmount1);
 
-    const tx = await program.methods
-        .startgame(new BN(100).mul(new BN(10 ** 9)), [...values.force.toBuffer()])
+    // Start game(send 100 A token to contract)
+    const tx_gamestart = await program.methods
+        .startgame(new BN(100).mul(new BN(10 ** 9)))
         .accounts({
           gamer: values.gamer.publicKey,
-          random: values.random,
-          treasury: values.random_treasury,
-          config: networkStateAccountAddress(),
-          vrf: values.vrf.programId,
-          gamerAccountA: values.gamerAccountA,
-          storeamount: values.storeamountPDA,
-          catpawconfig: values.catpawconfigPDA,
-          catpawAccountA: values.catpawAccountA,
         })
         .signers([values.gamer])
         .rpc({ skipPreflight: false });
 
-    console.log("transaction: ", tx);
+    console.log("Game start transaction: ", tx_gamestart);
     
     const gamerTokenAAmount2 = await connection
       .getTokenAccountBalance(values.gamerAccountA)
@@ -144,7 +130,7 @@ describe("catpaw", () => {
         return 0;
       });
 
-    console.log("gamerTokenAAmount2", gamerTokenAAmount2);
+    console.log("A token amount of Gamer after start game", gamerTokenAAmount2);
 
     const catpawTokenAAmount2 = await connection
       .getTokenAccountBalance(values.catpawAccountA)
@@ -155,355 +141,436 @@ describe("catpaw", () => {
         return 0;
       });
 
-    console.log("catpawTokenAAmount2", catpawTokenAAmount2);
+    console.log("A token amount of contract after start game", catpawTokenAAmount2);
 
     expect(Number(gamerTokenAAmount2)).to.equal(Number(gamerTokenAAmount1) - Number(new BN(100).mul(new BN(10 ** 9))));
     expect(Number(catpawTokenAAmount2)).to.equal(Number(catpawTokenAAmount1) + Number(new BN(100).mul(new BN(10 ** 9))));
-
-    const amountData = await program.account.storeAmount.fetch(values.storeamountPDA);
-    expect(Number(amountData.amount)).to.equal(Number(new BN(100).mul(new BN(10 ** 9))));
   });
 
-  // it("Game finish!", async () => {
+  it("Game finish!", async () => {
 
-  //   await mintingTokens({
-  //     connection: connection,
-  //     creator: values.cwv_treasury,
-  //     mintAKeypair: values.mintCWVKeypair,
-  //     program,
-  //   })
+    // A token create and 1000 mint to Gamer. Mint authority is Gamer.
+    await mintingTokens({
+      connection: connection,
+      creator:  values.gamer,
+      mintAKeypair: values.mintAKeypair,
+    });
 
-  //   await mintingTokens({
-  //     connection: connection,
-  //     creator: values.gamer,
-  //     mintAKeypair: values.mintAKeypair,
-  //     program,
-  //   })
+    // CWV token create and 1000 mint to cwv_treasury. Mint authority is cwv_treasury.
+    await mintingTokens({
+      connection: connection,
+      creator:  values.cwv_treasury,
+      mintAKeypair: values.mintCWVKeypair,
+    });
 
-  //   await program.methods
-  //     .init()
-  //     .accounts({
-  //       mintTokenA: values.mintAKeypair.publicKey, 
-  //       mintTokenCwv: values.mintCWVKeypair.publicKey,
-  //       storeAccount: values.authority,
-  //       authority: values.authority,
-  //       catpawconfig: values.catpawconfigPDA,
-  //       catpawAccountA: values.catpawAccountA,
-  //       catpawAccountCwv: values.catpawAccountCWV,
-  //     })
-  //     .rpc()
+    const tx_init = await program.methods
+      .init()
+      .accounts({
+        mintTokenA: values.mintAKeypair.publicKey, 
+        mintTokenCwv: values.mintCWVKeypair.publicKey,
+        storeAccount: values.authority,
+      })
+      .rpc({skipPreflight: false});
 
-  //   const configData = await program.account.catpawConfig.fetch(values.catpawconfigPDA);
+    console.log("Init transaction: ", tx_init);
+      
+    
+    const cwvTreasuryTokenCWVAmount1 = await connection
+      .getTokenAccountBalance(values.cwvtreasureAccountCWV)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
 
-  //   const cwv_treasuryTokenCWVAmount1 = await connection
-  //     .getTokenAccountBalance(values.cwvtreasureAccountCWV)
-  //     .then((data) => {
-  //       data.value.amount;
-  //     })
-  //     .catch(() => {
-  //       return 0;
-  //     });
+    console.log("CWV token amount of cwv_treasure before deposit CWV token to contract", cwvTreasuryTokenCWVAmount1);
 
-  //   console.log("cwv_treasuryTokenCWVAmount1", cwv_treasuryTokenCWVAmount1);
+    const catpawTokenCWVmount1 = await connection
+      .getTokenAccountBalance(values.catpawAccountCWV)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
 
-  //   const catpawTokenCWVAmount1 = await connection
-  //     .getTokenAccountBalance(values.catpawAccountCWV)
-  //     .then((data) => {
-  //       data.value.amount;
-  //     })
-  
-  //     .catch(() => {
-  //       return 0;
-  //     });
+    console.log("CWV token amount of contract before cwv_treasury deposit CWV token to contract", catpawTokenCWVmount1);
 
-  //   console.log("catpawTokenCWVAmount1", catpawTokenCWVAmount1);
+    //cwv_treasury wallet deposit 500 CWV token to contract
+    await program.methods
+      .depositCwv(new BN(500).mul(new BN(10 ** 9)))
+      .accounts({
+        mintTokenCwv: values.mintCWVKeypair.publicKey,
+      })
+      .signers([values.cwv_treasury])
+      .rpc({skipPreflight: false});
 
-  //   await expectRevert(
-  //     program.methods
-  //     .depositCwv(new BN(1000).mul(new BN(10 ** 9)))
-  //     .accounts({
-  //       mintTokenCwv: values.mintCWVKeypair.publicKey,
-  //       treasuryAccountCwv: values.cwvtreasureAccountCWV,
-  //       authority: values.authority,
-  //       catpawAccountCwv: values.catpawAccountCWV
-  //     })
-  //     .signers([values.cwv_treasury])
-  //     .rpc()
-  //   );
+    const cwvTreasuryTokenCWVAmount2 = await connection
+      .getTokenAccountBalance(values.cwvtreasureAccountCWV)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
 
-  //   const cwv_treasuryTokenCWVAmount2 = await connection
-  //     .getTokenAccountBalance(values.cwvtreasureAccountCWV)
-  //     .then((data) => {
-  //       data.value.amount;
-  //     })
-  //     .catch(() => {
-  //       return 0;
-  //     });
+    console.log("CWV token amount of cwv_treasure after deposit CWV token to contract", cwvTreasuryTokenCWVAmount2);
 
-  //   console.log("cwv_treasuryTokenCWVAmount2", cwv_treasuryTokenCWVAmount2);
+    const catpawTokenCWVmount2 = await connection
+      .getTokenAccountBalance(values.catpawAccountCWV)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
 
-  //   const catpawTokenCWVAmount2 = await connection
-  //     .getTokenAccountBalance(values.catpawAccountCWV)
-  //     .then((data) => {
-  //       data.value.amount;
-  //     })
-  //     .catch(() => {
-  //       return 0;
-  //     });
+    console.log("CWV token amount of contract after cwv_treasury deposit CWV token to contract", catpawTokenCWVmount2);
 
-  //   console.log("catpawTokenCWVAmount2", catpawTokenCWVAmount2);
+    expect(Number(cwvTreasuryTokenCWVAmount2)).to.equal(Number(cwvTreasuryTokenCWVAmount1) - Number(new BN(500).mul(new BN(10 ** 9))));
+    expect(Number(catpawTokenCWVmount2)).to.equal(Number(catpawTokenCWVmount1) + Number(new BN(500).mul(new BN(10 ** 9))));
 
-  //   expect(Number(cwv_treasuryTokenCWVAmount2)).to.equal(Number(cwv_treasuryTokenCWVAmount2) - Number(new BN(1000).mul(new BN(10 ** 9))));
-  //   expect(Number(catpawTokenCWVAmount2)).to.equal(Number(catpawTokenCWVAmount2) + Number(new BN(1000).mul(new BN(10 ** 9))));
+    const gamerTokenAAmount1 = await connection
+      .getTokenAccountBalance(values.gamerAccountA)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
 
-  //   await program.methods
-  //   .startgame(new BN(100).mul(new BN(10 ** 9)), [...values.force.toBuffer()])
-  //   .accounts({
-  //     random: values.random,
-  //     treasury: values.random_treasury,
-  //     config: networkStateAccountAddress(),
-  //     vrf: values.vrf.programId,
-  //     gamerAccountA: values.gamerAccountA,
-  //     storeamount: values.storeamountPDA,
-  //     catpawconfig: values.catpawconfigPDA,
-  //     catpawAccountA: values.catpawAccountA,
-  //   })
-  //   .signers([values.gamer])
-  //   .rpc()
+    console.log("A token amount of Gamer before start game", gamerTokenAAmount1);
 
-  //   const gamerTokenCWVAmount1 = await connection
-  //     .getTokenAccountBalance(values.gamerAccountCWV)
-  //     .then((data) => {
-  //       data.value.amount;
-  //     })
-  //     .catch(() => {
-  //       return 0;
-  //     });
+    const catpawTokenAAmount1 = await connection
+      .getTokenAccountBalance(values.catpawAccountA)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
 
-  //   console.log("gamerTokenCWVAmount1", gamerTokenCWVAmount1);
+    console.log("A token amount of contract before start game", catpawTokenAAmount1);
 
-  //   sleep(15);
+    // Start game(send 100 A token to contract)
+    const tx = await program.methods
+        .startgame(new BN(100).mul(new BN(10 ** 9)))
+        .accounts({
+          gamer: values.gamer.publicKey,
+        })
+        .signers([values.gamer])
+        .rpc({ skipPreflight: false });
 
-  //   await expectRevert(
-  //     program.methods
-  //     .finishGame()
-  //     .accounts({
-  //       mintTokenCwv: values.mintCWVKeypair.publicKey,
-  //       random: values.random,
-  //       treasury: values.random_treasury,
-  //       config: networkStateAccountAddress(),
-  //       vrf: values.vrf.programId,
-  //       storeamount: values.storeamountPDA,
-  //       gamerAccountCwv: values.gamerAccountCWV,
-  //       authority: values.authority,
-  //       catpawAccountCwv: values.catpawAccountCWV,
-  //     })
-  //     .signers([values.gamer])
-  //     .rpc()
-  //   );
+    console.log("game start transaction: ", tx);
+    
+    const gamerTokenAAmount2 = await connection
+      .getTokenAccountBalance(values.gamerAccountA)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
 
-  //   const gamerTokenCWVAmount2 = await connection
-  //     .getTokenAccountBalance(values.gamerAccountCWV)
-  //     .then((data) => {
-  //       data.value.amount;
-  //     })
-  //     .catch(() => {
-  //       return 0;
-  //     });
+    console.log("A token amount of Gamer after start game", gamerTokenAAmount2);
 
-  //   let randomnessFulfilled = await values.vrf.waitFulfilled(values.force.toBuffer());
-  //   let randomNumber = Buffer.from(randomnessFulfilled.randomness).readBigInt64LE();
-  //   console.log(randomNumber);
+    const catpawTokenAAmount2 = await connection
+      .getTokenAccountBalance(values.catpawAccountA)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
 
-  //   console.log("gamerTokenCWVAmount2", gamerTokenCWVAmount2);
+    console.log("A token amount of contract after start game", catpawTokenAAmount2);
 
-  //   expect(Number(gamerTokenCWVAmount2)).to.equal(Number(gamerTokenCWVAmount1) + Number(new BN(100).mul(new BN(10 ** 9)).mul(new BN(Number(randomNumber)))));
-  // });
+    // finish gamer of a user with random number(e.g. 3), this funtion is invoked only cwv_treasury wallet
+    await program.methods
+      .finishGame(new BN(3), new BN(100).mul(new BN(10 ** 9)))
+      .accounts({
+        mintTokenCwv: values.mintCWVKeypair.publicKey,
+        gamer: values.gamer.publicKey,
+      })
+      .rpc({ skipPreflight: false });
 
-  // it("Change A token address", async () => {
+    const catpawTokenCWVmount3 = await connection
+      .getTokenAccountBalance(values.catpawAccountCWV)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
 
-  //   await mintingTokens({
-  //     connection: connection,
-  //     creator:  values.gamer,
-  //     mintAKeypair: values.mintAKeypair,
-  //     program,
-  //   });
+    console.log("CWV token amount of contract after finish game", catpawTokenCWVmount3);
 
-  //   await mintingTokens({
-  //     connection: connection,
-  //     creator:  values.cwv_treasury,
-  //     mintAKeypair: values.newMintAKeypair,
-  //     program,
-  //   });
+    const gamerTokenCWVmount2 = await connection
+      .getTokenAccountBalance(values.gamerAccountCWV)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
 
-  //   await mintingTokens({
-  //     connection: connection,
-  //     creator:  values.cwv_treasury,
-  //     mintAKeypair: values.mintCWVKeypair,
-  //     program,
-  //   });
+    console.log("CWV token amount of Gamer after finish game", gamerTokenCWVmount2);
 
-  //   await program.methods
-  //     .init()
-  //     .accounts({
-  //       mintTokenA: values.mintAKeypair.publicKey, 
-  //       mintTokenCwv: values.mintCWVKeypair.publicKey,
-  //       storeAccount: values.authority,
-  //       authority: values.authority,
-  //       catpawconfig: values.catpawconfigPDA,
-  //       catpawAccountA: values.catpawAccountA,
-  //       catpawAccountCwv: values.catpawAccountCWV,
-  //     })
-  //     .rpc()
+    expect(Number(gamerTokenCWVmount2)).to.equal(Number(new BN(100).mul(new BN(10 ** 9)).mul(new BN(3))));
+  });
 
-  //   await expectRevert(
-  //     program.methods
-  //     .changeA()
-  //     .accounts({
-  //       newMintTokenA: values.newMintAKeypair.publicKey,
-  //       authority: values.authority,
-  //       catpawconfig: values.catpawconfigPDA,
-  //       catpawAccountA: values.catpawAccountA,
-  //     })
-  //     .rpc()
-  //   );
-  //   const accountData = await program.account.catpawConfig.fetch(values.catpawconfigPDA);
-  //   expect(accountData.mintTokenA.toString()).to.equal(values.newMintAKeypair.publicKey.toString());
-  // });
+  it("Change A(Pump.fun) token address, can be invoked with only cwv_treasury address", async () => {
 
-  // it("Change Storing address", async () => {
+    // A token create and 1000 mint to Gamer. Mint authority is Gamer.
+    await mintingTokens({
+      connection: connection,
+      creator:  values.gamer,
+      mintAKeypair: values.mintAKeypair,
+    });
 
-  //   await mintingTokens({
-  //     connection: connection,
-  //     creator: values.cwv_treasury,
-  //     mintAKeypair: values.mintCWVKeypair,
-  //     program,
-  //   })
+    // new A token create and 1000 mint to Gamer. Mint authority is Gamer.
+    await mintingTokens({
+      connection: connection,
+      creator:  values.gamer,
+      mintAKeypair: values.newMintAKeypair,
+    });
 
-  //   await mintingTokens({
-  //     connection: connection,
-  //     creator: values.gamer,
-  //     mintAKeypair: values.mintAKeypair,
-  //     program,
-  //   })
+    // CWV token create and 1000 mint to cwv_treasury. Mint authority is cwv_treasury.
+    await mintingTokens({
+      connection: connection,
+      creator:  values.cwv_treasury,
+      mintAKeypair: values.mintCWVKeypair,
+    });
 
-  //   await program.methods
-  //     .init()
-  //     .accounts({
-  //       mintTokenA: values.mintAKeypair.publicKey, 
-  //       mintTokenCwv: values.mintCWVKeypair.publicKey,
-  //       storeAccount: values.authority,
-  //       authority: values.authority,
-  //       catpawconfig: values.catpawconfigPDA,
-  //       catpawAccountA: values.catpawAccountA,
-  //       catpawAccountCwv: values.catpawAccountCWV,
-  //     })
-  //     .rpc()
+    const tx_init = await program.methods
+      .init()
+      .accounts({
+        mintTokenA: values.mintAKeypair.publicKey, 
+        mintTokenCwv: values.mintCWVKeypair.publicKey,
+        storeAccount: values.authority,
+      })
+      .rpc({skipPreflight: false});
 
-  //   await expectRevert(
-  //     program.methods
-  //     .changeTo()
-  //     .accounts({
-  //       newToAccount: values.newStoringKeypair.publicKey,
-  //       catpawconfig: values.catpawconfigPDA,
-  //       mintTokenA: values.mintAKeypair.publicKey,
-  //       catpawAccountCwv: values.catpawAccountCWV,
-  //     })
-  //     .rpc()
-  //   );
-  //   const accountData = await program.account.catpawConfig.fetch(values.catpawconfigPDA);
-  //   expect(accountData.storeTokenA.toString()).to.equal(values.newStoringKeypair.publicKey.toString());
-  // });
+    console.log("Init transaction: ", tx_init);
+    
+    const accountData1 = await program.account.catpawConfig.fetch(values.catpawconfigPDA);
 
-  // it("Withdraw", async () => {
+    // change A token address by cwv_treasury
+    await program.methods
+      .changeA()
+      .accounts({
+        newMintTokenA: values.newMintAKeypair.publicKey,
+        storeAccount: accountData1.storeTokenA
+      })
+      .rpc({ skipPreflight: false });
 
-  //   await mintingTokens({
-  //     connection: connection,
-  //     creator: values.cwv_treasury,
-  //     mintAKeypair: values.mintCWVKeypair,
-  //     program,
-  //   })
+    const accountData2 = await program.account.catpawConfig.fetch(values.catpawconfigPDA);
+    expect(accountData2.mintTokenA.toString()).to.equal(values.newMintAKeypair.publicKey.toString());
+  });
 
-  //   await mintingTokens({
-  //     connection: connection,
-  //     creator: values.gamer,
-  //     mintAKeypair: values.mintAKeypair,
-  //     program,
-  //   })
+  it("Confirm assert error if other address invoke change_a funtion", async () => {
 
-  //   await program.methods
-  //     .init()
-  //     .accounts({
-  //       mintTokenA: values.mintAKeypair.publicKey, 
-  //       mintTokenCwv: values.mintCWVKeypair.publicKey,
-  //       storeAccount: values.authority,
-  //       authority: values.authority,
-  //       catpawconfig: values.catpawconfigPDA,
-  //       catpawAccountA: values.catpawAccountA,
-  //       catpawAccountCwv: values.catpawAccountCWV,
-  //     })
-  //     .rpc()
+    // A token create and 1000 mint to Gamer. Mint authority is Gamer.
+    await mintingTokens({
+      connection: connection,
+      creator:  values.gamer,
+      mintAKeypair: values.mintAKeypair,
+    });
 
-  //   const configData = await program.account.catpawConfig.fetch(values.catpawconfigPDA);
+    // new A token create and 1000 mint to Gamer. Mint authority is Gamer.
+    await mintingTokens({
+      connection: connection,
+      creator:  values.gamer,
+      mintAKeypair: values.newMintAKeypair,
+    });
 
-  //   await program.methods
-  //   .startgame(new BN(100).mul(new BN(10 ** 9)), [...values.force.toBuffer()])
-  //   .accounts({
-  //     random: values.random,
-  //     treasury: values.random_treasury,
-  //     config: networkStateAccountAddress(),
-  //     vrf: values.vrf.programId,
-  //     gamerAccountA: values.gamerAccountA,
-  //     storeamount: values.storeamountPDA,
-  //     catpawconfig: values.catpawconfigPDA,
-  //     catpawAccountA: values.catpawAccountA,
-  //   })
-  //   .signers([values.gamer])
-  //   .rpc({ skipPreflight: true })
+    // CWV token create and 1000 mint to cwv_treasury. Mint authority is cwv_treasury.
+    await mintingTokens({
+      connection: connection,
+      creator:  values.cwv_treasury,
+      mintAKeypair: values.mintCWVKeypair,
+    });
 
-  //   const catpawAccountCWV = getAssociatedTokenAddressSync(
-  //     values.mintCWVKeypair.publicKey,
-  //     values.authority,
-  //     true
-  //   );
+    const tx_init = await program.methods
+      .init()
+      .accounts({
+        mintTokenA: values.mintAKeypair.publicKey, 
+        mintTokenCwv: values.mintCWVKeypair.publicKey,
+        storeAccount: values.authority,
+      })
+      .rpc({skipPreflight: false});
 
-  //   const catpawTokenACWVmount = await connection
-  //     .getTokenAccountBalance(catpawAccountCWV)
-  //     .then((data) => {
-  //       data.value.amount;
-  //     })
-  //     .catch(() => {
-  //       return 0;
-  //     });
+    console.log("Init transaction: ", tx_init);
+    
+    const accountData = await program.account.catpawConfig.fetch(values.catpawconfigPDA);
 
-  //   await expectRevert(
-  //     program.methods
-  //     .withdrawA(new BN(Number(catpawTokenACWVmount)))
-  //     .accounts({
-  //       mintTokenCwv: values.mintCWVKeypair.publicKey,
-  //       withdrawAccount: values.withdrawKeypair.publicKey,
-  //       catpawconfig: values.catpawconfigPDA,
-  //       authority: values.authority,
-  //       catpawAccountCwv: values.catpawAccountCWV,
-  //     })
-  //     .rpc()
-  //   );
+    // assert if other try to change A token address.
+    await expectRevert(program.methods
+      .changeA()
+      .accounts({
+        newMintTokenA: values.newMintAKeypair.publicKey,
+        storeAccount: accountData.storeTokenA
+      })
+      .signers([values.gamer])
+      .rpc({ skipPreflight: false }));
+  });
 
-  //   const withdrawAccountCWV = getAssociatedTokenAddressSync(
-  //     values.mintCWVKeypair.publicKey,
-  //     values.withdrawKeypair.publicKey,
-  //     true
-  //   );
+  it("Change Storing address", async () => {
 
-  //   const withdrawTokenACWVmount = await connection
-  //     .getTokenAccountBalance(withdrawAccountCWV)
-  //     .then((data) => {
-  //       data.value.amount;
-  //     })
-  //     .catch(() => {
-  //       return 0;
-  //     });
+    // CWV token create and 1000 mint to cwv_treasury. Mint authority is cwv_treasury.
+    await mintingTokens({
+      connection: connection,
+      creator: values.cwv_treasury,
+      mintAKeypair: values.mintCWVKeypair,
+    })
 
-  //   expect(Number(withdrawTokenACWVmount)).to.equal(Number(catpawTokenACWVmount));
-  // });
+    // A token create and 1000 mint to Gamer. Mint authority is Gamer.
+    await mintingTokens({
+      connection: connection,
+      creator: values.gamer,
+      mintAKeypair: values.mintAKeypair,
+    })
+
+    await program.methods
+      .init()
+      .accounts({
+        mintTokenA: values.mintAKeypair.publicKey, 
+        mintTokenCwv: values.mintCWVKeypair.publicKey,
+        storeAccount: values.authority,
+      })
+      .rpc({ skipPreflight: false })
+
+    // change destination address gamers send their A token by cwv_treasury
+    const tx_changeTo = await program.methods
+      .changeTo()
+      .accounts({
+        newToAccount: values.newStoringKeypair.publicKey,
+        mintTokenA: values.mintAKeypair.publicKey,
+      })
+      .rpc({ skipPreflight: false });
+    
+    console.log("changeto transaction", tx_changeTo);    
+
+    const accountData = await program.account.catpawConfig.fetch(values.catpawconfigPDA);
+    expect(accountData.storeTokenA.toString()).to.equal(values.newStoringKeypair.publicKey.toString());
+  });
+
+  it("Withdraw", async () => {
+
+    // A token create and 1000 mint to Gamer. Mint authority is Gamer.
+    await mintingTokens({
+      connection: connection,
+      creator:  values.gamer,
+      mintAKeypair: values.mintAKeypair,
+    });  
+
+    // CWV token create and 1000 mint to cwv_treasury. Mint authority is cwv_treasury.
+    await mintingTokens({
+      connection: connection,
+      creator:  values.cwv_treasury,
+      mintAKeypair: values.mintCWVKeypair,
+    });
+
+    const tx_init = await program.methods
+      .init()
+      .accounts({
+        mintTokenA: values.mintAKeypair.publicKey, 
+        mintTokenCwv: values.mintCWVKeypair.publicKey,
+        storeAccount: values.authority,
+      })
+      .rpc({skipPreflight: false});
+
+    console.log("Init transaction: ", tx_init);
+      
+    const gamerTokenAAmount1 = await connection
+      .getTokenAccountBalance(values.gamerAccountA)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
+
+    console.log("A token amount of Gamer before start game", gamerTokenAAmount1);
+
+    const catpawTokenAAmount1 = await connection
+      .getTokenAccountBalance(values.catpawAccountA)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
+
+    console.log("A token amount of contract before start game", catpawTokenAAmount1);
+
+    // Start game(send 100 A token to contract)
+    const tx_gamestart = await program.methods
+      .startgame(new BN(100).mul(new BN(10 ** 9)))
+      .accounts({
+        gamer: values.gamer.publicKey,
+      })
+      .signers([values.gamer])
+      .rpc({ skipPreflight: false });
+
+    console.log("Game start transaction: ", tx_gamestart);
+    
+    const gamerTokenAAmount2 = await connection
+      .getTokenAccountBalance(values.gamerAccountA)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
+
+    console.log("A token amount of Gamer after start game", gamerTokenAAmount2);
+
+    const catpawTokenAAmount2 = await connection
+      .getTokenAccountBalance(values.catpawAccountA)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
+
+    console.log("A token amount of contract after start game", catpawTokenAAmount2);
+
+    // withdraw 100 A token to withdraw account by cwv_treasury
+    const tx_withdraw = await program.methods
+      .withdrawA(new BN(100).mul(new BN(10 ** 9)))
+      .accounts({
+        withdrawAccount: values.withdrawKeypair.publicKey,
+        mintTokenA: values.mintAKeypair.publicKey,
+      })
+      .rpc({ skipPreflight: false });
+    
+    console.log("withdraw transaction", tx_withdraw);
+
+    const catpawTokenAAmount3 = await connection
+      .getTokenAccountBalance(values.catpawAccountA)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
+
+    console.log("A token amount of contract after withdraw", catpawTokenAAmount3);
+
+    const withdrawTokenAAmount = await connection
+      .getTokenAccountBalance(values.withdrawAccountA)
+      .then((data) => {
+        return data.value.amount;
+      })
+      .catch(() => {
+        return 0;
+      });
+    
+    console.log("A token amount of withdraw account after withdraw", withdrawTokenAAmount);
+
+    expect(Number(withdrawTokenAAmount)).to.equal(Number(new BN(100).mul(new BN(10 ** 9))));
+  });
 });

@@ -15,18 +15,6 @@ impl CatpawConfig {
     pub const LEN: usize = 8 + 32 + 32 + 32;
 }
 
-#[account]
-#[derive(Default)]
-pub struct StoreAmount {
-    pub amount: u64,
-    pub force: [u8; 32],
-    pub flag: bool,
-}
-
-impl StoreAmount {
-    pub const LEN: usize = 8 + 8 + 32 + 1;
-}
-
 #[event]
 pub struct GameFinishEvent {
     pub user: Pubkey,
@@ -35,6 +23,7 @@ pub struct GameFinishEvent {
 }
 
 #[event]
-pub struct GameDelayEvent {
-    pub delay: bool,
+pub struct GameStartEvent {
+    pub user: Pubkey,
+    pub amount: u64,
 }

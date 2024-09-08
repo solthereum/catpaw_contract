@@ -29,6 +29,7 @@ pub struct ChangeTo<'info> {
     pub cwv_treasury: Signer<'info>,
 
     #[account(
+        mut,
         seeds = [b"catpawconfig"],
         bump,
     )]
@@ -36,6 +37,7 @@ pub struct ChangeTo<'info> {
 
     //New A token gamer have to buy from Pump.fun to play game.
     /// CHECK: safe, 
+    #[account(mut)]
     pub new_to_account: AccountInfo<'info>,
 
     // A token gamer have to buy from Pump.fun to play game.
@@ -48,7 +50,7 @@ pub struct ChangeTo<'info> {
         associated_token::mint = mint_token_a,
         associated_token::authority = new_to_account,
     )]
-    pub catpaw_account_cwv: Box<Account<'info, TokenAccount>>,
+    pub catpaw_account_a: Box<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,

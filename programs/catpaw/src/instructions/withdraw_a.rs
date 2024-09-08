@@ -6,16 +6,30 @@ use anchor_spl::{
 };
 
 use crate::account_models::CatpawConfig;
+pub const AUTHORITY_SEED: &str = "authority";
 
 pub fn withdraw_a(ctx: Context<WithdrawA>, amount: u64) -> Result<()> {
+
+        ctx.accounts.catpawconfig.reload()?;
+        let owner = ctx.accounts.catpawconfig.cwv_treasury;
+        assert_eq!(owner, ctx.accounts.cwv_treasury.key());
+
+        let authority_bump = ctx.bumps.authority;
+        let authority_seeds = &[
+            AUTHORITY_SEED.as_bytes(),
+            &[authority_bump],
+        ];
+        let signer_seeds = &[&authority_seeds[..]];
+
         token::transfer(
-                CpiContext::new(
+                CpiContext::new_with_signer(
                     ctx.accounts.token_program.to_account_info(),
                     Transfer {
-                        from: ctx.accounts.catpaw_account_cwv.to_account_info(),
-                        to: ctx.accounts.withdraw_account_cwv.to_account_info(),
+                        from: ctx.accounts.catpaw_account_a.to_account_info(),
+                        to: ctx.accounts.withdraw_account_a.to_account_info(),
                         authority: ctx.accounts.authority.to_account_info(),
                     },
+                    signer_seeds,
                 ),
                 amount,
         )?;
@@ -30,27 +44,30 @@ pub struct WithdrawA<'info> {
         constraint = cwv_treasury.to_account_info().key() == catpawconfig.cwv_treasury.key()
     )]
     pub cwv_treasury: Signer<'info>,
+    
+    //Withdraw target address.
+    /// CHECK: safe, 
+    #[account(mut)]
+    pub withdraw_account: AccountInfo<'info>,
+
     //A token PDA account of gamer, no need to init because it has PDA account already,
     #[account(
         init_if_needed,
         payer = cwv_treasury,
-        associated_token::mint = mint_token_cwv,
+        associated_token::mint = mint_token_a,
         associated_token::authority = withdraw_account,
     )]
-    pub withdraw_account_cwv: Box<Account<'info, TokenAccount>>,
+    pub withdraw_account_a: Box<Account<'info, TokenAccount>>,
     
     // A token 
-    pub mint_token_cwv: Box<Account<'info, Mint>>,
+    pub mint_token_a: Box<Account<'info, Mint>>,
 
     #[account(
+        mut,
         seeds = [b"catpawconfig"],
         bump,
     )]
     pub catpawconfig: Account<'info, CatpawConfig>,
-
-    //Withdraw target address.
-    /// CHECK: safe, 
-    pub withdraw_account: AccountInfo<'info>,
 
     /// CHECK: safe, 
     /// smart contract authority to be used for sending CWV token to gamer
@@ -64,10 +81,10 @@ pub struct WithdrawA<'info> {
     //A token PDA account of authority.
     #[account(
         mut,
-        associated_token::mint = mint_token_cwv,
+        associated_token::mint = mint_token_a,
         associated_token::authority = authority,
     )]
-    pub catpaw_account_cwv: Box<Account<'info, TokenAccount>>,
+    pub catpaw_account_a: Box<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,

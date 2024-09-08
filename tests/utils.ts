@@ -1,7 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Keypair, PublicKey, Connection, Signer } from "@solana/web3.js";
 import { createMint, getAssociatedTokenAddressSync, getOrCreateAssociatedTokenAccount, mintTo } from '@solana/spl-token';
-import { randomnessAccountAddress, Orao } from "@orao-network/solana-vrf";
 require("dotenv").config();
 
 const fs = require("fs");
@@ -19,84 +18,31 @@ export async function sleep(seconds: number) {
   new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 }
 
-// export const mintingTokens = async ({
-//   connection,
-//   creator,
-//   holder = creator,
-//   mintAKeypair,
-//   mintedAmount = 1000,
-//   decimals = 9,
-// }: {
-//   connection: Connection;
-//   creator: Signer;
-//   holder?: Signer;
-//   mintAKeypair: Keypair;
-//   mintedAmount?: number;
-//   decimals?: number;
-// }) => {
-//   await createMint(connection, creator, creator.publicKey, creator.publicKey, decimals, mintAKeypair);
-//   await getOrCreateAssociatedTokenAccount(connection, holder, mintAKeypair.publicKey, holder.publicKey, true);
-//   await mintTo(
-//     connection,
-//     creator,
-//     mintAKeypair.publicKey,
-//     getAssociatedTokenAddressSync(mintAKeypair.publicKey, holder.publicKey, true),
-//     creator.publicKey,
-//     mintedAmount * 10 ** decimals,
-//   );
-// };
-
 export const mintingTokens = async ({
   connection,
   creator,
+  holder = creator,
   mintAKeypair,
-  program,
+  mintedAmount = 1000,
+  decimals = 9,
 }: {
   connection: Connection;
   creator: Signer;
   holder?: Signer;
   mintAKeypair: Keypair;
   mintedAmount?: number;
-  program: any;
+  decimals?: number;
 }) => {
-  const metadata = {
-    name: "Rocket Fun",
-    symbol: "ROCKETFUN",
-    uri: "https://gateway.pinata.cloud/ipfs/QmRRn1UZJHKjLbq2EtZcrEjn2qeUX6B2cjYLir233Dk5vn",
-  };
-
-  const associatedTokenAccount = await getAssociatedTokenAddressSync(
+  await createMint(connection, creator, creator.publicKey, creator.publicKey, decimals, mintAKeypair);
+  await getOrCreateAssociatedTokenAccount(connection, holder, mintAKeypair.publicKey, holder.publicKey, true);
+  await mintTo(
+    connection,
+    creator,
     mintAKeypair.publicKey,
-    creator.publicKey
+    getAssociatedTokenAddressSync(mintAKeypair.publicKey, holder.publicKey, true),
+    creator.publicKey,
+    mintedAmount * 10 ** decimals,
   );
-
-  // Derive PDA for metadata account
-  const [metadataPDA, _] = await PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("metadata"),
-      new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s").toBuffer(),
-      mintAKeypair.publicKey.toBuffer(),
-    ],
-    new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s") // The public key of the token metadata program
-  );
-
-  const tx = await program.methods
-    .createTokenMint(metadata.name, metadata.symbol, metadata.uri)
-    .accounts({
-      payer: creator.publicKey,
-      mintAccount: mintAKeypair.publicKey,
-      associatedTokenAccount,
-      metadataAccount: metadataPDA,
-      tokenMetadataProgram: new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"),
-    })
-    .signers([mintAKeypair, creator])
-    .rpc();
-
-  // Fetch and decode the metadata account
-  const metadataAccountInfo = await connection.getAccountInfo(metadataPDA);
-  if (metadataAccountInfo === null) {
-    throw new Error("Failed to fetch metadata account info");
-  }
 };
 
 export interface TestValues {
@@ -116,10 +62,7 @@ export interface TestValues {
   gamerAccountCWV: PublicKey;
   catpawAccountCWV: PublicKey;
   cwvtreasureAccountCWV: PublicKey;
-  vrf: Orao;
-  random: PublicKey;
-  random_treasury: PublicKey;
-  force: PublicKey;
+  withdrawAccountA: PublicKey;
 }
 
 export function createValues(): TestValues {
@@ -187,21 +130,11 @@ export function createValues(): TestValues {
     true
   );
 
-  let force = Keypair.generate().publicKey;
-  
-  const vrf = new Orao(anchor.getProvider() as any);
-  // const random = randomnessAccountAddress(force.toBuffer());
-  
-  const [random] = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("orao-vrf-randomness-request"),
-      // force.toBuffer()
-      Buffer.from("random")
-    ],
-    new PublicKey("VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y")
+  const withdrawAccountA = getAssociatedTokenAddressSync(
+    mintAKeypair.publicKey,
+    withdrawKeypair.publicKey,
+    true
   );
-
-  const random_treasury = new PublicKey("9ZTHWWZDpB36UFe1vszf2KEpt83vwi27jDqtHQ7NSXyR");
 
   return {
     cwv_treasury,
@@ -220,9 +153,6 @@ export function createValues(): TestValues {
     gamerAccountCWV,
     catpawAccountCWV,
     cwvtreasureAccountCWV,
-    vrf,
-    random,
-    random_treasury,
-    force,
+    withdrawAccountA,
   };
 }
