@@ -12,7 +12,7 @@ pub fn change_a(ctx: Context<ChangeA>) -> Result<()> {
         ctx.accounts.catpawconfig.reload()?;
         let owner = ctx.accounts.catpawconfig.cwv_treasury;
 
-        assert_eq!(owner, ctx.accounts.cwv_treasury.key());
+        assert_eq!(owner, ctx.accounts.cwv_treasury.key());//Can be called by only cwv_treasury.
 
         let catpawconfig = &mut ctx.accounts.catpawconfig;
         catpawconfig.mint_token_a = ctx.accounts.new_mint_token_a.key();
@@ -22,6 +22,7 @@ pub fn change_a(ctx: Context<ChangeA>) -> Result<()> {
 
 #[derive(Accounts)]
 pub struct ChangeA<'info> {
+    //Can be called by only cwv_treasury.
     #[account(
         mut,
         constraint = cwv_treasury.to_account_info().key() == catpawconfig.cwv_treasury.key()

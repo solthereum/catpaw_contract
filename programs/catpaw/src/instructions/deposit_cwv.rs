@@ -6,19 +6,20 @@ use anchor_spl::{
 };
 
 pub fn deposit_cwv(ctx: Context<DepositCWV>, amount: u64) -> Result<()> {
-        token::transfer(
-                CpiContext::new(
-                    ctx.accounts.token_program.to_account_info(),
-                    Transfer {
-                        from: ctx.accounts.treasury_account_cwv.to_account_info(),
-                        to: ctx.accounts.catpaw_account_cwv.to_account_info(),
-                        authority: ctx.accounts.treasury.to_account_info(),
-                    },
-                ),
-                amount,
-        )?;
+    //Deposit amount of CWV token to contract address.
+    token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.treasury_account_cwv.to_account_info(),
+                    to: ctx.accounts.catpaw_account_cwv.to_account_info(),
+                    authority: ctx.accounts.treasury.to_account_info(),
+                },
+            ),
+            amount,
+    )?;
 
-        Ok(())
+    Ok(())
 }
 
 #[derive(Accounts)]
@@ -33,7 +34,7 @@ pub struct DepositCWV<'info> {
     )]
     pub treasury_account_cwv: Box<Account<'info, TokenAccount>>,
     
-    // A token 
+    // CWV token 
     pub mint_token_cwv: Box<Account<'info, Mint>>,
 
     /// CHECK: safe, 

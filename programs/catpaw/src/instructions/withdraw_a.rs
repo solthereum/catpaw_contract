@@ -10,47 +10,49 @@ pub const AUTHORITY_SEED: &str = "authority";
 
 pub fn withdraw_a(ctx: Context<WithdrawA>, amount: u64) -> Result<()> {
 
-        ctx.accounts.catpawconfig.reload()?;
-        let owner = ctx.accounts.catpawconfig.cwv_treasury;
-        assert_eq!(owner, ctx.accounts.cwv_treasury.key());
+    ctx.accounts.catpawconfig.reload()?;
+    let owner = ctx.accounts.catpawconfig.cwv_treasury;
+    assert_eq!(owner, ctx.accounts.cwv_treasury.key());//Can be called by only cwv_treasury.
 
-        let authority_bump = ctx.bumps.authority;
-        let authority_seeds = &[
-            AUTHORITY_SEED.as_bytes(),
-            &[authority_bump],
-        ];
-        let signer_seeds = &[&authority_seeds[..]];
+    let authority_bump = ctx.bumps.authority;
+    let authority_seeds = &[
+        AUTHORITY_SEED.as_bytes(),
+        &[authority_bump],
+    ];
+    let signer_seeds = &[&authority_seeds[..]];
 
-        token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    Transfer {
-                        from: ctx.accounts.catpaw_account_a.to_account_info(),
-                        to: ctx.accounts.withdraw_account_a.to_account_info(),
-                        authority: ctx.accounts.authority.to_account_info(),
-                    },
-                    signer_seeds,
-                ),
-                amount,
-        )?;
+    //Sent A token from contract to withdraw_account.
+    token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.catpaw_account_a.to_account_info(),
+                    to: ctx.accounts.withdraw_account_a.to_account_info(),
+                    authority: ctx.accounts.authority.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            amount,
+    )?;
 
-        Ok(())
+    Ok(())
 }
 
 #[derive(Accounts)]
 pub struct WithdrawA<'info> {
+    //Can be called by only cwv_treasury.
     #[account(
         mut,
         constraint = cwv_treasury.to_account_info().key() == catpawconfig.cwv_treasury.key()
     )]
     pub cwv_treasury: Signer<'info>,
     
-    //Withdraw target address.
     /// CHECK: safe, 
+    //Withdraw target address.
     #[account(mut)]
     pub withdraw_account: AccountInfo<'info>,
 
-    //A token PDA account of gamer, no need to init because it has PDA account already,
+    //A token PDA account of withdraw_account
     #[account(
         init_if_needed,
         payer = cwv_treasury,

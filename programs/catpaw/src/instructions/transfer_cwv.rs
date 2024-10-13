@@ -12,7 +12,7 @@ pub fn transfer_cwv(ctx: Context<TransferCWV>, multiply: u64, amount: u64) -> Re
     
     ctx.accounts.catpawconfig.reload()?;
     let owner = ctx.accounts.catpawconfig.cwv_treasury;
-    assert_eq!(owner, ctx.accounts.cwv_treasury.key());
+    assert_eq!(owner, ctx.accounts.cwv_treasury.key());//Can be called by only cwv_treasury.
 
     let authority_bump = ctx.bumps.authority;
     let authority_seeds = &[
@@ -21,28 +21,30 @@ pub fn transfer_cwv(ctx: Context<TransferCWV>, multiply: u64, amount: u64) -> Re
     ];
     let signer_seeds = &[&authority_seeds[..]];
 
-        token::transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.catpaw_account_cwv.to_account_info(),
-                    to: ctx.accounts.gamer_account_cwv.to_account_info(),
-                    authority: ctx.accounts.authority.to_account_info(),
-                },
-                signer_seeds
-            ),
-            multiply * amount,
-        )?;
-        emit!(GameFinishEvent {
-            user: ctx.accounts.gamer.key(),
-            amount: amount,
-            multiply: multiply,
-        });
-        Ok(())
+    //Sent <multiply * amount> amount of CWV token to gamer.
+    token::transfer(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.catpaw_account_cwv.to_account_info(),
+                to: ctx.accounts.gamer_account_cwv.to_account_info(),
+                authority: ctx.accounts.authority.to_account_info(),
+            },
+            signer_seeds
+        ),
+        multiply * amount,
+    )?;
+    emit!(GameFinishEvent {
+        user: ctx.accounts.gamer.key(),
+        amount: amount,
+        multiply: multiply,
+    });
+    Ok(())
 }
 
 #[derive(Accounts)]
 pub struct TransferCWV<'info> {
+    //Can be called by only cwv_treasury.
     #[account(
         mut,
         constraint = cwv_treasury.to_account_info().key() == catpawconfig.cwv_treasury.key()

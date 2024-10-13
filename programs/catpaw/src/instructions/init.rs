@@ -9,12 +9,13 @@ use anchor_spl::{
 use crate::account_models::CatpawConfig;
 
 pub fn init(ctx: Context<Initialize>) -> Result<()> {
-        let catpawconfig = &mut ctx.accounts.catpawconfig;
-        catpawconfig.cwv_treasury = ctx.accounts.cwv_treasury.key();
-        catpawconfig.mint_token_a = ctx.accounts.mint_token_a.key();
-        catpawconfig.store_token_a = ctx.accounts.store_account.key();
-        msg!("Catpaw config created!");
-        Ok(())
+    //Store treasury wallet of smart contract, A token address, A token storing address from Init parameter.
+    let catpawconfig = &mut ctx.accounts.catpawconfig;
+    catpawconfig.cwv_treasury = ctx.accounts.cwv_treasury.key();
+    catpawconfig.mint_token_a = ctx.accounts.mint_token_a.key();
+    catpawconfig.store_token_a = ctx.accounts.store_account.key();
+    msg!("Catpaw config created!");
+    Ok(())
 }
 
 #[derive(Accounts)]
@@ -24,7 +25,7 @@ pub struct Initialize<'info> {
     pub cwv_treasury: Signer<'info>,
     
     /// CHECK: safe, 
-    /// smart contract authority to be used for sending CWV token to gamer
+    /// Smart contract authority to be used for sending CWV token to gamer
     #[account(
         mut,
         seeds = [b"authority"],
@@ -32,7 +33,7 @@ pub struct Initialize<'info> {
     )]
     pub authority: AccountInfo<'info>,
 
-    // Store treasury wallet of smart contract, A token address, A token storing address
+    // Store treasury wallet of smart contract, A token address, A token storing address(contract itself or other specified address)
     #[account(
         init_if_needed,
         payer = cwv_treasury,
@@ -47,6 +48,7 @@ pub struct Initialize<'info> {
     pub mint_token_a: Box<Account<'info, Mint>>,
 
     ///CHECK: safe 
+    //A token storing address(contract itself or other specified address)
     #[account(mut)]
     pub store_account: AccountInfo<'info>,
 
